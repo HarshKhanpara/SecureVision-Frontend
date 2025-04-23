@@ -122,7 +122,7 @@ const Dashboard = () => {
 
   // Update the time every second
   useEffect(() => {
-    if (!email || !ip_url) router.push("/camera-stream");
+    if (!email || !ip_url) router.push("/live");
     console.log(email);
     const timer = setInterval(() => {
       setCurrentTime(new Date().toLocaleTimeString());
