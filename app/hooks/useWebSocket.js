@@ -4,7 +4,7 @@ export function useWebSocket(email) {
     useEffect(() => {
       if (!email) return;
   
-      const socket = new WebSocket(`ws://localhost:8000/ws/alerts/${email}`);
+      const socket = new WebSocket(`ws://great-papayas-march.loca.lt/ws/alerts/${email}`);
   
       socket.onmessage = (event) => {
         setMessages((prev) => [...prev, event.data]);

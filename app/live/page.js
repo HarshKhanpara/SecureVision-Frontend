@@ -38,11 +38,12 @@ export default function CameraStream() {
       console.log("Uploading data:", { email, ip,cctvName });
 
       const response = await axios.post(
-        "https://icy-poets-take.loca.lt//get-live-logs",
+        "https://great-papayas-march.loca.lt//get-live-logs",
         formData,
         {
           headers: {
             "Content-Type": "multipart/form-data",
+            "bypass-tunnel-reminder": "true", // Bypass the tunnel page
           },
         }
       );
