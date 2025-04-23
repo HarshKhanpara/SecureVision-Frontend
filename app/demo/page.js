@@ -38,7 +38,7 @@ export default function VideoUploadForm() {
     try {
       console.log('Uploading data:', { email, videoCount: videos.length });
   
-      const response = await axios.post('http://localhost:8000/upload_data', formData, {
+      const response = await axios.post('https://icy-poets-take.loca.lt//upload_data', formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },

@@ -38,7 +38,7 @@ export default function CameraStream() {
       console.log("Uploading data:", { email, ip,cctvName });
 
       const response = await axios.post(
-        "http://localhost:8000/get-live-logs",
+        "https://icy-poets-take.loca.lt//get-live-logs",
         formData,
         {
           headers: {
