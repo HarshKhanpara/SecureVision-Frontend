@@ -28,12 +28,15 @@ import { useRouter } from "next/navigation";
 import { useEmailStore } from "@/store/emailStore";
 import { useIpStore } from "@/store/ipStore";
 import { useCctvNameStore } from "@/store/cctvNameStore";
+import { Concert_One } from "next/font/google";
 
 const Dashboard = () => {
   const router = useRouter();
   const email = useEmailStore((state) => state.email);
-  const ip_url = useIpStore((state) => state.ip);
-  const cctvName = useCctvNameStore((state) => state.cctvName);
+
+  const ips = useIpStore((state) => state.ips);
+  // const ips = ["http://192.168.1.48:8080/video"];
+  const cctvNames = useCctvNameStore((state) => state.cctvNames);
   const [logs, setLogs] = useState([
     {
       timestamp: "10:15 AM",
@@ -45,16 +48,21 @@ const Dashboard = () => {
   ]);
 
   useEffect(() => {
-    const ws = new WebSocket("wss://great-papayas-march.loca.lt/ws/logs");
-
+    const ws = new WebSocket("ws://localhost:8000/ws/logs");
+    console.log("Ips recieived", ips);
+    console.log("CCTV Names", cctvNames);
     ws.onmessage = (event) => {
+      console.log("IPs", ips);
       console.log("event", event);
       const rawText = event.data;
-      console.log("Received raw log:", rawText);
       const log = parseRawLog(rawText, email);
       if (log) {
-        setLogs((prevLogs) => [log, ...prevLogs]);
-      }
+        setLogs((prevLogs) => {
+          const updatedLogs = [log, ...prevLogs];
+          console.log("Updated logs:", updatedLogs); // Add this
+          return updatedLogs;
+        });
+              }
     };
 
     return () => ws.close();
@@ -122,7 +130,9 @@ const Dashboard = () => {
 
   // Update the time every second
   useEffect(() => {
-    if (!email || !ip_url) router.push("/live");
+    if (email.trim().length === 0 && ips.length === 0 && cctvNames.length === 0) {
+      router.push("/live");
+    }
     console.log(email);
     const timer = setInterval(() => {
       setCurrentTime(new Date().toLocaleTimeString());
@@ -424,9 +434,19 @@ const Dashboard = () => {
                   Video Preview
                 </h3>
 
-                <div className="w-full flex justify-center items-center">
-                  <img
-                    src={ip_url}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {ips.map((ip, index) => (
+                    <div
+                      key={ip}
+                      className="bg-gray-900 p-4 rounded-2xl border border-gray-800 shadow-md flex flex-col items-center"
+                    >
+                      {console.log("ip", ip)}
+                      <h3 className="text-lg font-semibold text-gray-100 mb-2">
+                        {cctvNames[index] || `CCTV ${index + 1}`}
+                      </h3>
+
+                      <img
+                    src={ip}
                     alt="Live CCTV Feed"
                     className="rounded-xl border border-gray-700"
                     style={{
@@ -436,11 +456,13 @@ const Dashboard = () => {
                       objectFit: "contain",
                     }}
                   />
-                </div>
 
-                <p className="text-sm text-gray-400 font-semibold text-center break-words">
-                  {cctvName} - {ip_url}
-                </p>
+                      <p className="text-sm text-gray-400 mt-2 break-all">
+                        {ip}
+                      </p>
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
           </div>

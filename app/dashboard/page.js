@@ -63,7 +63,7 @@ const Dashboard = () => {
   ]);
 
   useEffect(() => {
-    const ws = new WebSocket("wss://great-papayas-march.loca.lt/ws/logs");
+    const ws = new WebSocket("ws://localhost:8000/ws/logs");
 
     ws.onmessage = (event) => {
       console.log("event", event);

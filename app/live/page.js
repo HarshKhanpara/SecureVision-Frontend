@@ -7,55 +7,90 @@ import { useRouter } from "next/navigation";
 import axios from "axios";
 import { useIpStore } from "@/store/ipStore";
 import { useCctvNameStore } from "@/store/cctvNameStore";
+import { useState } from "react";
 
 export default function CameraStream() {
   const email = useEmailStore((state) => state.email);
   const setEmail = useEmailStore((state) => state.setEmail);
 
-  const ip = useIpStore(state => state.ip);
-  const setIp = useIpStore(state => state.setIp);
 
-  const cctvName = useCctvNameStore(state => state.cctvName);
-  const setCctvName = useCctvNameStore(state => state.setcctvName);
-  
+  const cctvNames = useCctvNameStore((state) => state.cctvNames);
+  const addCctvName = useCctvNameStore((state) => state.addCctvName);
+  const removeCctvName = useCctvNameStore((state) => state.removeCctvName);
+  const clearCctvNames = useCctvNameStore((state) => state.clearCctvNames);
+  const ips = useIpStore((state) => state.ips);
+  const setIps = useIpStore((state) => state.setIps);
+  const addIp = useIpStore((state) => state.addIp);
+  const removeIp = useIpStore((state) => state.removeIp);
+  const [ipInput, setIpInput] = useState("");
+  const [cctvInput, setCctvInput] = useState("");
+
   const router = useRouter();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    if (!email || !ip || !cctvName) {
-      alert("Please provide an email and ip url and CCTV name");
-      console.log("Submission blocked: Missing email or ip url or CCTV name");
+    if (!email || ips.length === 0 || cctvNames.length === 0) {
+      alert("Email, IPs, and CCTV names are required");
+      return;
+    }
+
+    if (ips.length !== cctvNames.length) {
+      alert("Mismatch between number of IPs and CCTV names");
       return;
     }
 
     const formData = new FormData();
     formData.append("email", email);
-    formData.append("cctv_name", cctvName);
-    formData.append('ip_url', ip);
 
+    for (let i = 0; i < ips.length; i++) {
+      formData.append("ip_urls", ips[i]);
+      formData.append("cctv_names", cctvNames[i]);
+    }
+    console.log("IP URLs:", ips);
+    console.log("CCTV Names:", cctvNames);
+    // for(let i = 0; i < cctvNames.length; i++) {
+    //   console.log("cctv_name[]", cctvNames[i]);
+    // }
+    // for(let i = 0; i < ips.length; i++) {
+    //   console.log("ip_url[]", ips[i]);
+    // }
     try {
-      console.log("Uploading data:", { email, ip,cctvName });
-
       const response = await axios.post(
-        "https://great-papayas-march.loca.lt//get-live-logs",
+        "http://localhost:8000/get-live-logs",
         formData,
         {
           headers: {
             "Content-Type": "multipart/form-data",
-            "bypass-tunnel-reminder": "true", // Bypass the tunnel page
           },
         }
       );
-
-      console.log("Upload successful:", response.data);
-      router.push("/live-dashboard"); // Navigate to dashboard
-    } catch (error) {
-      console.error("Upload failed:", error);
-      alert("Upload failed. Please try again.");
+      
+      console.log("Success:", response.data);
+      // clearIps();
+      // clearCctvNames();
+      router.push("/live-dashboard");
+    } catch (err) {
+      console.error("Failed:", err);
+      alert("Upload failed");
     }
   };
 
+  const handleAdd = () => {
+    if (!ipInput || !cctvInput) return alert("Both IP and CCTV Name are required");
+    addIp(ipInput);
+    addCctvName(cctvInput);
+    setIpInput("");
+    setCctvInput("");
+  };
+
+  const handleRemove = (index) => {
+    removeIp(ips[index]);
+    removeCctvName(cctvNames[index]);
+  };
+
+
+  
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-950 via-gray-900 to-slate-900 flex items-center justify-center p-6">
       <form
@@ -84,44 +119,56 @@ export default function CameraStream() {
           />
         </div>
 
-        <div>
-          <label
-            htmlFor="ip_url"
-            className="block text-sm font-semibold text-gray-300 mb-1"
-          >
-            IP of Camera
-          </label>
-          <input
-            type="text"
-            id="ip_url"
-            value={ip}
-            onChange={(e) => setIp(e.target.value)}
-            placeholder="192.168.0.100:5000"
-            required
-            className="block w-full px-4 py-2 bg-gray-800/60 text-white border border-gray-700/40 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition"
-          />
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium mb-1">IP Address</label>
+            <input
+              type="text"
+              value={ipInput}
+              onChange={(e) => setIpInput(e.target.value)}
+              placeholder="192.168.0.1:5000"
+              className="w-full px-4 py-2 rounded-xl bg-gray-700 border border-gray-600"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-1">CCTV Name</label>
+            <input
+              type="text"
+              value={cctvInput}
+              onChange={(e) => setCctvInput(e.target.value)}
+              placeholder="Main Gate"
+              className="w-full px-4 py-2 rounded-xl bg-gray-700 border border-gray-600"
+            />
+          </div>
         </div>
 
+        <button
+          type="button"
+          onClick={handleAdd}
+          className="w-full mt-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 rounded-xl"
+        >
+          + Add to List
+        </button>
 
-        <div>
-          <label
-            htmlFor="cctv_name"
-            className="block text-sm font-semibold text-gray-300 mb-1"
-          >
-            Name of CCTV
-          </label>
-          <input
-            type="text"
-            id="cctv_name"
-            value={cctvName}
-            onChange={(e) => setCctvName(e.target.value)}
-            placeholder="CCTV1"
-            required
-            className="block w-full px-4 py-2 bg-gray-800/60 text-white border border-gray-700/40 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition"
-          />
+        <div className="space-y-2">
+          {ips.map((ip, idx) => (
+            <div
+              key={idx}
+              className="flex justify-between items-center px-4 py-2 bg-gray-700 rounded-xl"
+            >
+              <span>
+                {cctvNames[idx]} — {ip}
+              </span>
+              <button
+                type="button"
+                onClick={() => handleRemove(idx)}
+                className="text-red-400 hover:text-red-600"
+              >
+                Remove
+              </button>
+            </div>
+          ))}
         </div>
-
-
         <button
           type="submit"
           className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-semibold py-3 px-6 rounded-xl transition-all duration-300 shadow-lg shadow-blue-900/30"
