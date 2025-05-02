@@ -28,15 +28,44 @@ import { useRouter } from "next/navigation";
 import { useEmailStore } from "@/store/emailStore";
 import { useIpStore } from "@/store/ipStore";
 import { useCctvNameStore } from "@/store/cctvNameStore";
-import { Concert_One } from "next/font/google";
+import { LiveFeedComponent } from "@/components/LiveFeedComponent";
+import { AlertsComponent } from "@/components/AlertsComponent";
+import { StatsComponent } from "@/components/StatsComponent";
+import { MapComponent } from "@/components/MapComponent";
 
 const Dashboard = () => {
   const router = useRouter();
   const email = useEmailStore((state) => state.email);
+  const [alertLogs, setAlertLogs] = useState([]);
+  const [filters, setFilters] = useState({
+    timestampFrom: "",
+    timestampTo: "",
+    zone: "",
+    violenceType: "",
+    severity: "all", // info, warning, alert
+  });
+
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+  const [newEmail, setNewEmail] = useState(email);
+  const cctvNames = useCctvNameStore((state) => state.cctvNames);
+  const [newCctvNames, setNewCctvNames] = useState([...cctvNames]);
+
+  const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
+
+  const [logLimit, setLogLimit] = useState(100);
+  const [notificationLimit, setNotificationLimit] = useState(5);
+  const [downloadLimit, setDownloadLimit] = useState(50);
+
+  const handleUserProfile = () => {
+    setNewEmail(email);
+    setNewCctvNames([...cctvNames]);
+    setIsProfileModalOpen(true);
+  };
+
+  const [isFilterOpen, setIsFilterOpen] = useState(false);
 
   const ips = useIpStore((state) => state.ips);
   // const ips = ["http://192.168.1.48:8080/video"];
-  const cctvNames = useCctvNameStore((state) => state.cctvNames);
   const [logs, setLogs] = useState([
     {
       timestamp: "10:15 AM",
@@ -60,9 +89,12 @@ const Dashboard = () => {
         setLogs((prevLogs) => {
           const updatedLogs = [log, ...prevLogs];
           console.log("Updated logs:", updatedLogs); // Add this
+          if (log.type === "alert") {
+            setAlertLogs((prevAlerts) => [log, ...prevAlerts]);
+          }
           return updatedLogs;
         });
-              }
+      }
     };
 
     return () => ws.close();
@@ -130,7 +162,11 @@ const Dashboard = () => {
 
   // Update the time every second
   useEffect(() => {
-    if (email.trim().length === 0 && ips.length === 0 && cctvNames.length === 0) {
+    if (
+      email.trim().length === 0 &&
+      ips.length === 0 &&
+      cctvNames.length === 0
+    ) {
       router.push("/live");
     }
     console.log(email);
@@ -190,7 +226,7 @@ const Dashboard = () => {
   const handleShare = () => {
     const format = "pdf"; // You can add more formats here
     // Create a sanitized version of logs without non-serializable data
-    const sanitizedLogs = logs.map((log) => {
+    const sanitizedLogs = logs.slice(0, downloadLimit).map((log) => {
       const { icon, ...rest } = log; // Remove the icon property
       return rest;
     });
@@ -245,23 +281,25 @@ const Dashboard = () => {
 
   // Handle filter
   const handleFilter = () => {
-    // Simulate filtering logs
-    alert("Filter functionality to be implemented.");
+    setIsFilterOpen((prev) => !prev);
   };
 
   // Handle settings
   const handleSettings = () => {
-    alert("Settings functionality to be implemented.");
+    setIsSettingsModalOpen(true);
   };
 
   // Handle notifications
   const handleNotifications = () => {
-    alert("Notifications functionality to be implemented.");
-  };
-
-  // Handle user profile
-  const handleUserProfile = () => {
-    alert("User profile functionality to be implemented.");
+    if (alertLogs.length === 0) {
+      alert("No alerts at the moment.");
+    } else {
+      const messages = alertLogs
+      .slice(0, notificationLimit)
+      .map((log) => `${log.timestamp} - ${log.user}: ${log.message}`)
+        .join("\n\n");
+      alert(`Recent Alerts:\n\n${messages}`);
+    }
   };
 
   // Sort logs by timestamp (newest first)
@@ -269,6 +307,44 @@ const Dashboard = () => {
     return (
       new Date(`2025/03/22 ${b.timestamp}`) -
       new Date(`2025/03/22 ${a.timestamp}`)
+    );
+  });
+
+  const filteredLogs = sortedLogs.filter((log) => {
+    const logTime = new Date(`2025/03/22 ${log.timestamp}`);
+
+    const fromTime = filters.timestampFrom
+      ? new Date(`2025/03/22 ${filters.timestampFrom}`)
+      : null;
+    const toTime = filters.timestampTo
+      ? new Date(`2025/03/22 ${filters.timestampTo}`)
+      : null;
+
+    const matchesTime =
+      (!fromTime || logTime >= fromTime) && (!toTime || logTime <= toTime);
+
+    const matchesZone =
+      !filters.zone ||
+      log.message.toLowerCase().includes(filters.zone.toLowerCase());
+
+    const matchesViolence =
+      !filters.violenceType ||
+      log.message.toLowerCase().includes(filters.violenceType.toLowerCase());
+
+    const matchesSeverity =
+      filters.severity === "all" || log.type === filters.severity;
+
+    const matchesSearch =
+      searchQuery.trim() === "" ||
+      log.message.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      log.user.toLowerCase().includes(searchQuery.toLowerCase());
+
+    return (
+      matchesTime &&
+      matchesZone &&
+      matchesViolence &&
+      matchesSeverity &&
+      matchesSearch
     );
   });
 
@@ -392,7 +468,7 @@ const Dashboard = () => {
             </div>
             <div className="relative">
               <div className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-red-500 flex items-center justify-center text-xs font-bold">
-                3
+                {alertLogs.length}
               </div>
               <button
                 className="w-10 h-10 rounded-xl bg-gray-900/60 border border-gray-800/50 flex items-center justify-center text-blue-400 hover:text-blue-300 shadow-sm"
@@ -446,16 +522,16 @@ const Dashboard = () => {
                       </h3>
 
                       <img
-                    src={ip}
-                    alt="Live CCTV Feed"
-                    className="rounded-xl border border-gray-700"
-                    style={{
-                      maxWidth: "100%",
-                      maxHeight: "600px",
-                      aspectRatio: "16/9",
-                      objectFit: "contain",
-                    }}
-                  />
+                        src={ip}
+                        alt="Live CCTV Feed"
+                        className="rounded-xl border border-gray-700"
+                        style={{
+                          maxWidth: "100%",
+                          maxHeight: "600px",
+                          aspectRatio: "16/9",
+                          objectFit: "contain",
+                        }}
+                      />
 
                       <p className="text-sm text-gray-400 mt-2 break-all">
                         {ip}
@@ -487,14 +563,129 @@ const Dashboard = () => {
                   >
                     <FiFilter className="text-gray-300 hover:text-white" />
                   </button>
+                  <button
+                    className="p-2 bg-gray-800/90 rounded-xl hover:bg-green-600/80 transition-colors duration-200 border border-gray-700/50"
+                    onClick={handleShare}
+                    title="Download Logs"
+                  >
+                    <FiDownload className="text-gray-300 hover:text-white" />
+                  </button>
                 </div>
               </div>
 
+              {isFilterOpen && (
+                <div className="bg-gray-800/60 border border-gray-700/50 rounded-xl p-4 mb-4 transition-all duration-300 space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-gray-200">
+                    <div>
+                      <label className="block mb-1">From Time:</label>
+                      <input
+                        type="text"
+                        placeholder="e.g. 10:00 AM"
+                        value={filters.timestampFrom}
+                        onChange={(e) =>
+                          setFilters((prev) => ({
+                            ...prev,
+                            timestampFrom: e.target.value,
+                          }))
+                        }
+                        className="w-full px-3 py-2 rounded-lg bg-gray-900 border border-gray-700"
+                      />
+                    </div>
+                    <div>
+                      <label className="block mb-1">To Time:</label>
+                      <input
+                        type="text"
+                        placeholder="e.g. 12:00 PM"
+                        value={filters.timestampTo}
+                        onChange={(e) =>
+                          setFilters((prev) => ({
+                            ...prev,
+                            timestampTo: e.target.value,
+                          }))
+                        }
+                        className="w-full px-3 py-2 rounded-lg bg-gray-900 border border-gray-700"
+                      />
+                    </div>
+                    <div>
+                      <label className="block mb-1">Zone:</label>
+                      <input
+                        type="text"
+                        placeholder="e.g. Lobby"
+                        value={filters.zone}
+                        onChange={(e) =>
+                          setFilters((prev) => ({
+                            ...prev,
+                            zone: e.target.value,
+                          }))
+                        }
+                        className="w-full px-3 py-2 rounded-lg bg-gray-900 border border-gray-700"
+                      />
+                    </div>
+                    <div>
+                      <label className="block mb-1">Violence Type:</label>
+                      <input
+                        type="text"
+                        placeholder="e.g. Punch"
+                        value={filters.violenceType}
+                        onChange={(e) =>
+                          setFilters((prev) => ({
+                            ...prev,
+                            violenceType: e.target.value,
+                          }))
+                        }
+                        className="w-full px-3 py-2 rounded-lg bg-gray-900 border border-gray-700"
+                      />
+                    </div>
+                    <div>
+                      <label className="block mb-1">Severity:</label>
+                      <select
+                        value={filters.severity}
+                        onChange={(e) =>
+                          setFilters((prev) => ({
+                            ...prev,
+                            severity: e.target.value,
+                          }))
+                        }
+                        className="w-full px-3 py-2 rounded-lg bg-gray-900 border border-gray-700"
+                      >
+                        <option value="all">All</option>
+                        <option value="info">Info</option>
+                        <option value="warning">Warning</option>
+                        <option value="alert">Alert</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="flex justify-end space-x-4">
+                    <button
+                      onClick={() =>
+                        setFilters({
+                          timestampFrom: "",
+                          timestampTo: "",
+                          zone: "",
+                          violenceType: "",
+                          severity: "all",
+                        })
+                      }
+                      className="px-4 py-2 bg-gray-700 text-sm rounded-md text-white hover:bg-gray-600 transition"
+                    >
+                      Reset Filters
+                    </button>
+                    <button
+                      onClick={() => setIsFilterOpen(false)}
+                      className="px-4 py-2 bg-blue-600 text-sm rounded-md text-white hover:bg-blue-700 transition"
+                    >
+                      Apply Filters
+                    </button>
+                  </div>
+                </div>
+              )}
+
               <div className="space-y-4 overflow-y-auto h-[440px] pr-2 custom-scrollbar">
-                {sortedLogs.map((log, index) => (
+                {filteredLogs.slice(0, logLimit).map((log, index) => (
                   <div key={index} className="relative pl-8 pb-6 group">
                     {/* Timeline line */}
-                    {index !== sortedLogs.length - 1 && (
+                    {index !== filteredLogs.length - 1 && (
                       <div className="absolute left-3 top-8 bottom-0 w-0.5 bg-gradient-to-b from-gray-700/60 to-gray-800/30"></div>
                     )}
 
@@ -556,6 +747,129 @@ const Dashboard = () => {
             </div>
           </div>
         </div>
+
+        {isProfileModalOpen && (
+          <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center">
+            <div className="bg-gray-900 border border-gray-700 rounded-2xl p-6 w-full max-w-md shadow-2xl space-y-4">
+              <h2 className="text-xl font-semibold text-white">
+                Update Profile
+              </h2>
+
+              {/* Email Input */}
+              <div>
+                <label className="text-sm text-gray-400">Email:</label>
+                <input
+                  type="email"
+                  value={newEmail}
+                  onChange={(e) => setNewEmail(e.target.value)}
+                  className="w-full px-3 py-2 mt-1 rounded-lg bg-gray-800 border border-gray-700 text-white"
+                />
+              </div>
+
+              {/* CCTV Name Inputs */}
+              <div>
+                <label className="text-sm text-gray-400">CCTV Names:</label>
+                <div className="space-y-2 mt-1">
+                  {newCctvNames.map((name, index) => (
+                    <input
+                      key={index}
+                      type="text"
+                      value={name}
+                      onChange={(e) => {
+                        const updated = [...newCctvNames];
+                        updated[index] = e.target.value;
+                        setNewCctvNames(updated);
+                      }}
+                      className="w-full px-3 py-2 rounded-lg bg-gray-800 border border-gray-700 text-white"
+                    />
+                  ))}
+                </div>
+              </div>
+
+              {/* Modal Buttons */}
+              <div className="flex justify-end gap-4 pt-4">
+                <button
+                  onClick={() => setIsProfileModalOpen(false)}
+                  className="px-4 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-600"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => {
+                    useEmailStore.getState().setEmail(newEmail);
+                    useCctvNameStore.getState().setCctvNames(newCctvNames);
+                    setIsProfileModalOpen(false);
+                  }}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                >
+                  Save
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {isSettingsModalOpen && (
+          <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center">
+            <div className="bg-gray-900 border border-gray-700 rounded-2xl p-6 w-full max-w-md shadow-2xl space-y-4">
+              <h2 className="text-xl font-semibold text-white">Settings</h2>
+
+              <div>
+                <label className="text-sm text-gray-400">
+                  Max Logs to Display:
+                </label>
+                <input
+                  type="number"
+                  value={logLimit}
+                  onChange={(e) => setLogLimit(Number(e.target.value))}
+                  min={10}
+                  className="w-full px-3 py-2 mt-1 rounded-lg bg-gray-800 border border-gray-700 text-white"
+                />
+              </div>
+
+              <div>
+                <label className="text-sm text-gray-400">
+                  Max Alerts in Notifications:
+                </label>
+                <input
+                  type="number"
+                  value={notificationLimit}
+                  onChange={(e) => setNotificationLimit(Number(e.target.value))}
+                  min={1}
+                  className="w-full px-3 py-2 mt-1 rounded-lg bg-gray-800 border border-gray-700 text-white"
+                />
+              </div>
+
+              <div>
+                <label className="text-sm text-gray-400">
+                  Max Logs to Download:
+                </label>
+                <input
+                  type="number"
+                  value={downloadLimit}
+                  onChange={(e) => setDownloadLimit(Number(e.target.value))}
+                  min={10}
+                  className="w-full px-3 py-2 mt-1 rounded-lg bg-gray-800 border border-gray-700 text-white"
+                />
+              </div>
+
+              <div className="flex justify-end gap-4 pt-4">
+                <button
+                  onClick={() => setIsSettingsModalOpen(false)}
+                  className="px-4 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-600"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => setIsSettingsModalOpen(false)}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                >
+                  Save
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       <style jsx>{`
