@@ -28,10 +28,6 @@ import { useRouter } from "next/navigation";
 import { useEmailStore } from "@/store/emailStore";
 import { useIpStore } from "@/store/ipStore";
 import { useCctvNameStore } from "@/store/cctvNameStore";
-import { LiveFeedComponent } from "@/components/LiveFeedComponent";
-import { AlertsComponent } from "@/components/AlertsComponent";
-import { StatsComponent } from "@/components/StatsComponent";
-import { MapComponent } from "@/components/MapComponent";
 
 const Dashboard = () => {
   const router = useRouter();
